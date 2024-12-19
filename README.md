@@ -22,6 +22,7 @@ Please contact tadahaya[at]gmail.com before publishing your paper using the cont
 ------------  
 
     ├── LICENSE  
+    │
     ├── README.md               <- The top-level README for developers using this project.  
     │
     ├── requirements.txt        <- The requirements file for reproducing the analysis environment, 
@@ -35,7 +36,7 @@ Please contact tadahaya[at]gmail.com before publishing your paper using the cont
         │
         ├── core.py             <- Interactive runner of this module.
         │
-        ├── cli_YYMMDD_01.py    <- CLI runner of this module.
+        ├── cli.py              <- CLI runner of this module.
         │  
         └── src                 <- Main src for this module.
 

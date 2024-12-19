@@ -20,10 +20,20 @@ def parse_note_file(filename):
         return date, version
     return None
 
+def find_top_level_packages():
+    packages = []
+    for root, dirs, files in os.walk("."):
+        if "__init__.py" in files:
+            relative_path = os.path.relpath(root, ".")
+            package_name = relative_path.replace(os.sep, ".")
+            if not any(package_name.startswith(pkg + ".") for pkg in packages):
+                packages.append(package_name)
+    return packages[0] # top level package
+
 # Dynamically retrieve the version
 def get_version():
     version = None
-    package_dir = 'my_package'
+    package_dir = find_top_level_packages()
     init_file_path = os.path.join(package_dir, '__init__.py')
     if os.path.exists(init_file_path):
         with open(init_file_path) as f:
@@ -38,7 +48,8 @@ def get_version():
 # Dynamically retrieve the author
 def get_author():
     author = None
-    init_file_path = os.path.join('my_package', '__init__.py')
+    package_dir = find_top_level_packages()
+    init_file_path = os.path.join(find_top_level_packages, '__init__.py')
     
     if os.path.exists(init_file_path):
         with open(init_file_path) as f:
