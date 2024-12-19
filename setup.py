@@ -3,6 +3,7 @@ import re
 from setuptools import setup, find_packages
 
 # 0. pythonバージョンを指定
+description = "a template for an original package" # need to update
 python_ver = "3.10" # need to check
 
 # 1. Read the requirements from the requirements.txt file
@@ -101,7 +102,7 @@ else:
 setup(
     name=f"{package_name}",
     version=f"{get_version()}",
-    description="a template for a NN package",
+    description=f"{description}",
     author=f"{get_author()}",
     packages=find_packages(),
     install_requires=install_requirements,
