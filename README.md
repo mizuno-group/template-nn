@@ -8,7 +8,8 @@ a template for Neural Network
     - Contactの追記  
 - module内の変更  
     - 直下の__init__.pyのversionを適宜変更  
-    - setup.py冒頭のpython versionを適宜変更  
+    - setup.py冒頭のdescriptionを更新  
+    - setup.py冒頭のpython versionを確認  
 
 # Note
 This repository is under construction and will be officially released by [Mizuno group](https://github.com/mizuno-group).  
