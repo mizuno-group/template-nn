@@ -97,6 +97,12 @@ else:
     raise FileNotFoundError("No valid 'cli_' file found in the current directory.")
 
 
+print(f"package_name: {package_name}")
+print(f"module_name: {module_name}")
+print(f"version: {get_version()}")
+print(f"author: {get_author()}")
+
+
 # 3. Define the setup function
 # modify entry_points to use command line if needed
 # {COMMAND NAME}={module path}:{function in the module}
