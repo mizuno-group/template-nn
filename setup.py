@@ -2,10 +2,6 @@ import os
 import re
 from setuptools import setup, find_packages
 
-
-print("hello")
-
-
 # 0. pythonバージョンを指定
 python_ver = "3.10" # need to check
 
@@ -53,7 +49,7 @@ def get_version():
 def get_author():
     author = None
     package_dir = find_top_level_packages()
-    init_file_path = os.path.join(find_top_level_packages, '__init__.py')
+    init_file_path = os.path.join(package_dir, '__init__.py')
     
     if os.path.exists(init_file_path):
         with open(init_file_path) as f:
