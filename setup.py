@@ -2,6 +2,10 @@ import os
 import re
 from setuptools import setup, find_packages
 
+
+print("hello")
+
+
 # 0. pythonバージョンを指定
 python_ver = "3.10" # need to check
 
