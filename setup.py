@@ -61,7 +61,6 @@ def get_author():
         author = "Default Author"
     return author
 
-
 # Find the package name dynamically
 package_name = None
 for subdir in os.listdir('.'):
@@ -95,13 +94,6 @@ if latest_file:
     module_name = os.path.basename(latest_file).split('.')[0]  # Extract the module name without '.py'
 else:
     raise FileNotFoundError("No valid 'cli_' file found in the current directory.")
-
-
-print(f"package_name: {package_name}")
-print(f"module_name: {module_name}")
-print(f"version: {get_version()}")
-print(f"author: {get_author()}")
-
 
 # 3. Define the setup function
 # modify entry_points to use command line if needed
