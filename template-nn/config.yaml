@@ -1,0 +1,19 @@
+# config file (yaml)
+# === I/O ===
+device: null
+exp_name: null
+# === Data ===
+num_workers: 4
+pin_memory: True
+# === Model ===
+output_dim: 10
+num_blokcs: 2
+# === Training ===
+batch_size: 32
+epochs: 100
+lr: 0.01
+accum_grad: 1
+clip_grad: 1.0
+save_model_every: 10
+patience: 10
+early_stop_mode: 'min'

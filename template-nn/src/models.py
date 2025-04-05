@@ -2,7 +2,7 @@
 """
 Created on Fri 29 15:46:32 2022
 
-例: ResNet-18
+ResNet-like model for image classification.
 
 @author: tadahaya
 """
@@ -20,8 +20,10 @@ class Block(nn.Module):
     ----------
     channel_in : int
         Number of input channels.
+
     channel_out : int
         Number of output channels.
+
     stride : int, optional
         Stride for the first convolutional layer. Default is 1.
 
@@ -51,7 +53,7 @@ class Block(nn.Module):
             )
 
 
-    def forward(self,x):
+    def forward(self, x):
         """
         Forward pass through the residual block.
 
@@ -82,7 +84,7 @@ class MyNet(nn.Module):
         Number of output dimensions for the final classification layer.
 
     """
-    def __init__(self, output_dim=None):
+    def __init__(self, output_dim:int=None, num_blocks:int=2):
         super().__init__()
 
         # Initial convolutional layer
@@ -95,13 +97,13 @@ class MyNet(nn.Module):
         # (B, 64, H/2, W/2) -> (B, 64, H/4, W/4)
         
         # Residual blocks
-        self.block0 = self._building_block(64, 64, stride=1, num_blocks=2)
+        self.block0 = self._building_block(64, 64, stride=1, num_blocks=num_blocks)
         # (B, 64, H/4, W/4) -> (B, 64, H/4, W/4), keep the same size
-        self.block1 = self._building_block(64, 128, stride=2, num_blocks=2)
+        self.block1 = self._building_block(64, 128, stride=2, num_blocks=num_blokcs)
         # (B, 64, H/4, W/4) -> (B, 128, H/8, W/8), downsample
-        self.block2 = self._building_block(128, 256, stride=2, num_blocks=2)
+        self.block2 = self._building_block(128, 256, stride=2, num_blocks=num_blokcs)
         # (B, 128, H/8, W/8) -> (B, 256, H/16, W/16), downsample
-        self.block3 = self._building_block(256, 512, stride=2, num_blocks=2)
+        self.block3 = self._building_block(256, 512, stride=2, num_blocks=num_blokcs)
         # (B, 256, H/16, W/16) -> (B, 512, H/32, W/32), downsample
 
         # Final layers
@@ -145,10 +147,13 @@ class MyNet(nn.Module):
         ----------
         channel_in : int
             Number of input channels.
+
         channel_out : int
             Number of output channels.
+
         stride : int
             Stride for the first convolutional layer.
+
         num_blocks : int
             Number of residual blocks to create.
 

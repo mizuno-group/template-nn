@@ -3,10 +3,14 @@
 
 notebook上での使用などインタラクティブなクラスを提供
 
+ToDo
+- testする.
+
 @author: tadahaya
 """
 # packages installed in the current environment
 import os, time, yaml, inspect
+from typing import Optional, Union, List, Any
 import numpy as np
 import pandas as pd
 import torch
@@ -45,15 +49,22 @@ class BaseInteractive:
         """ load model """
         raise NotImplementedError
 
-
+# ToDo: interactiveにbatchなど必要な情報を読み込ませる
 class Interactive(BaseInteractive):
     """ class for training and prediction """
     def __init__(
-            self, config_path: str, train_data=None, test_data=None,
-            train_label=None, test_label=None,
-            outdir: str=None, exp_name: str=None, seed: int=42
+            self,
+            config_path: str=None,
+            train_data=None,
+            test_data=None,
+            train_label=None,
+            test_label=None,
+            outdir: Optional[str]=None,
+            exp_name: Optional[str]=None,
+            seed: int=42
             ):
         # arguments
+        assert config_path is not None, "!! Give config_path !!"
         assert outdir is not None, "!! Give outdir !!"
         self.train_data, self.test_data = train_data, test_data
         self.train_label, self.test_label = train_label, test_label
@@ -69,7 +80,7 @@ class Interactive(BaseInteractive):
         self.model = None
         self.trainer = None
         # fix seed
-        g, seed_worker = utils.fix_seed(seed, fix_cuda=True)
+        g, seed_worker = utils.fix_seed(seed, fix_cuda=False)
         self._seed = {"seed": seed, "g": g, "seed_worker": seed_worker}
         # prepare model
         self.init_model()

@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 
-CLI template
+CUIテンプレート
+
+ToDo
+- 実装する
+- testする
 
 @author: tadahaya
 """
 # packages installed in the current environment
-import os
-import datetime
-import argparse
-import time
+import os, datetime, argparse, time
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm, trange
 
 # original packages in src
 from .src import utils
@@ -54,77 +53,6 @@ cfg["outdir"] = args.workdir + '/results/' + now # for output
 if not os.path.exists(cfg["outdir"]):
     os.makedirs(cfg["outdir"])
 cfg["device"] = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') # get device
-
-# データの準備
-def prepare_data():
-    """
-    データの読み込み・ローダーの準備を実施
-    加工済みのものをdataにおいておくか, argumentで指定したパスから呼び出すなりしてデータを読み込む
-    inference用を読み込む際のものも用意しておくと楽
-    例ではCIFAR10を使用
-    
-    """
-    from torchvision.datasets import CIFAR10
-    full_train_set = CIFAR10(root=cfg["workdir"], train=True, download=True, transform=None)
-    general_transform = dh.get_general_transforms()
-    train_set, test_set = dh.split_dataset(
-        full_train_set, split_ratio=0.8, transform=general_transform, shuffle=True
-        )
-    train_loader = dh.prep_dataloader(
-        train_set, cfg["batch_size"], shuffle=True, num_workers=cfg["num_workers"], pin_memory=True
-        )
-    test_loader = dh.prep_dataloader(
-        test_set, cfg["batch_size"], shuffle=False, num_workers=cfg["num_workers"], pin_memory=True
-        )
-    return train_loader, test_loader
-
-
-# model等の準備
-def prepare_model():
-    """
-    model, loss, optimizer, schedulerの準備
-    argumentでコントロールする場合には適宜if文使うなり
-
-    """
-    model = MyNet(output_dim=10)
-    model.to(cfg["device"])
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=cfg["lr"])
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=cfg['num_epochs'], eta_min=0
-        )
-    return model, criterion, optimizer, scheduler
-
-
-# === あまりタスクに依存しない ===
-# 学習
-def fit(model, train_loader, test_loader, criterion, optimizer, scheduler):
-    """
-    学習を実施
-
-    Args:
-        model (nn.Module): モデル
-        train_loader (DataLoader): 学習用データローダ
-        test_loader (DataLoader): テスト用データローダ
-        criterion (torch.nn): 損失関数
-        optimizer (torch.optim): 最適化手法
-        scheduler (torch.optim.lr_scheduler): スケジューラ
-
-    Returns:
-        nn.Module: 学習後のモデル
-        list: 学習時のlossのリスト
-        list: テスト時のlossのリスト
-
-    """
-    trainer = Trainer(
-        model=model, optimizer=optimizer, criterion=criterion,
-        exp_name='exp', device=cfg["device"], scheduler=scheduler
-        )
-    train_loss, test_loss, accuracies = trainer.train(
-        train_loader, test_loader, num_epochs=cfg["num_epochs"],
-        save_model_every_n_epochs=cfg["save_every_n_epochs"]
-        )
-    return model, train_loss, test_loss, accuracies
 
 
 def main():

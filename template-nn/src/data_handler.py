@@ -4,10 +4,6 @@ Created on Fri 29 15:46:32 2022
 
 pytorchでのデータセットの実装のテンプレート.
 基本的にはMyDatasetクラスを実装し, DataLoaderを作成する関数があればよい.
-他には以下があると便利.
-- trainとvalのデータセットを分ける関数
-- 上記を行うためのSubsetWrapperクラス
-- データのチェック用関数
 
 @author: tadahaya
 """
@@ -35,7 +31,12 @@ class MyDataset(Dataset):
     transform : Optional[callable]
         Transformation function to apply to the data samples.
     """
-    def __init__(self, data:np.ndarray, label:Optional[np.ndarray]=None, transform=None):
+    def __init__(
+        self,
+        data:np.ndarray=None,
+        label:Optional[np.ndarray]=None,
+        transform:Optional[callable]=None
+        ) -> None:
         if data is None:
             raise ValueError("`data` cannot be None. Please provide the input data.")
         if label is None:
@@ -72,8 +73,13 @@ class MyDataset(Dataset):
 
 
 def prep_dataloader(
-    dataset, batch_size, shuffle=None, num_workers=2, pin_memory=True,
-    g=None, seed_worker=None
+    dataset:Dataset=None,
+    batch_size:int=None,
+    shuffle:Optional[bool]=None,
+    num_workers:int=2,
+    pin_memory:bool=True,
+    g:Optional[torch.Generator]=None,
+    seed_worker:Optional[callable]=None
     ) -> DataLoader:
     """
     prepare train and test loader
@@ -149,10 +155,13 @@ def split_dataset(
     ----------
     full_dataset : torch.utils.data.Dataset
         The dataset to split.
+
     split_ratio : float
         The ratio of the dataset to use for training.
+
     shuffle : bool
         Whether to shuffle the data before splitting.
+
     transform : Tuple[Optional[List[callable]], Optional[List[callable]]]
         Transformations to apply to the training and validation datasets.
         The first element is for the training dataset and the second is for the validation dataset.
