@@ -2,7 +2,7 @@ import os
 import re
 from setuptools import setup, find_packages
 
-# 0. pythonバージョンを指定
+# 0. pythonバージョンを指定する。
 description = "a template for an original package" # need to update
 python_ver = "3.10" # need to check
 

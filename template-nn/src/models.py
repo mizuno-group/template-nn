@@ -2,7 +2,7 @@
 """
 Created on Fri 29 15:46:32 2022
 
-example: ResNet18 architecture
+例: ResNet-18
 
 @author: tadahaya
 """
@@ -16,10 +16,15 @@ class Block(nn.Module):
     """
     A residual block consisting of three convolutional layers with skip connections.
 
-    Args:
-        channel_in (int): Number of input channels.
-        channel_out (int): Number of output channels.
-        stride (int, optional): Stride for the first convolutional layer. Defaults to 1.
+    Parameters
+    ----------
+    channel_in : int
+        Number of input channels.
+    channel_out : int
+        Number of output channels.
+    stride : int, optional
+        Stride for the first convolutional layer. Default is 1.
+
     """
     def __init__(self, channel_in, channel_out, stride=1):
         super().__init__()
@@ -30,13 +35,11 @@ class Block(nn.Module):
             )
         # bias=False: Batch normalization layer is used after the convolutional layer
         self.bn1 = nn.BatchNorm2d(channel_out) # Batch normalization
-
         # 2nd convolution (3 x 3)
         self.conv2 = nn.Conv2d(
             channel_out, channel_out, kernel_size=(3,3), stride=1, padding=1, bias=False
             )
         self.bn2 = nn.BatchNorm2d(channel_out) # Batch normalization
-
         # Shortcut connection (identity mapping or projection)
         self.shortcut = nn.Sequential()
         if stride != 1 or channel_in != channel_out:
@@ -51,12 +54,12 @@ class Block(nn.Module):
     def forward(self,x):
         """
         Forward pass through the residual block.
-        
-        Args:
-            x (Tensor): Input tensor of shape (batch_size, channel_in, height, width).
 
-        Returns:
-            Tensor: Output tensor of shape (batch_size, channel_out, height, width).
+        Parameters
+        ----------
+        x : Tensor
+            Input tensor of shape (batch_size, channel_in, height, width).
+
         """
         shortcut = self.shortcut(x) # Skip connection
         h = self.conv1(x) # Shape: (batch_size, C, H, W)
@@ -73,10 +76,13 @@ class MyNet(nn.Module):
     """
     A ResNet-like neural network for classification tasks.
 
-    Args:
-        output_dim (int): Number of output dimensions for the final classification layer.
+    Parameters
+    ----------
+    output_dim : int
+        Number of output dimensions for the final classification layer.
+
     """
-    def __init__(self, output_dim):
+    def __init__(self, output_dim=None):
         super().__init__()
 
         # Initial convolutional layer
@@ -108,11 +114,11 @@ class MyNet(nn.Module):
         """
         Forward pass through the network.
         
-        Args:
-            x (Tensor): Input tensor of shape (batch_size, 3, height, width).
+        Parameters
+        ----------
+        x : Tensor
+            Input tensor of shape (batch_size, 3, height, width).
 
-        Returns:
-            Tensor: Output tensor of shape (batch_size, output_dim).
         """
         # Initial convolutional layer
         h = self.conv1(x) # (B, 3, H, W) -> (B, 64, H/2, W/2)
@@ -135,14 +141,17 @@ class MyNet(nn.Module):
         """
         Helper function to create a residual block.
 
-        Args:
-            channel_out (int): Number of input channels.
-            channel_in (int): Number of output channels.
-            stride (int): Stride for the first convolutional layer.
-            num_blocks (int): Number of residual blocks to create.
+        Parameters
+        ----------
+        channel_in : int
+            Number of input channels.
+        channel_out : int
+            Number of output channels.
+        stride : int
+            Stride for the first convolutional layer.
+        num_blocks : int
+            Number of residual blocks to create.
 
-        Returns:
-            Block: A residual block instance.
         """
         layers = []
         layers.append(Block(channel_in, channel_out, stride)) # First block with stride
