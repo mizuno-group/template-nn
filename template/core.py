@@ -159,7 +159,7 @@ class Interactive(BaseInteractive):
             num_workers=self.config["num_workers"],
             pin_memory=self.config["pin_memory"],
             g=self._seed["g"],
-            seed_workers=self._seed["seed_worker"]
+            seed_worker=self._seed["seed_worker"]
             )
         if self.test_data is None:
             return train_loader, None
