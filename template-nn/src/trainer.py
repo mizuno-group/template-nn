@@ -227,7 +227,7 @@ class Trainer(BaseTrainer):
                     break
             # save the model
             if self.save_model_every > 0 and (i + 1) % self.save_model_every == 0:
-                utils.save_checkpoint(model=self.model, optimizer=self.optimizer, name=f"epoch_{i + 1}", outdir=self.resdir)
+                utils.save_checkpoint(model=self.model, optimizer=self.optimizer, name=f"epoch-{i + 1}", outdir=self.resdir)
         # save the experiment
         elapsed_time = utils.calc_elapsed_time(start_time)
         self.history["elapsed_time"] = elapsed_time

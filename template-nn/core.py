@@ -29,6 +29,14 @@ class BaseInteractive:
     def __init__(self):
         pass
 
+    def init_model(self):
+        """ initialize model """
+        raise NotImplementedError
+
+    def set_params(self):
+        """ set parameters """
+        raise NotImplementedError
+
     def prep_data(self):
         """ prepare data """
         raise NotImplementedError
@@ -49,7 +57,7 @@ class BaseInteractive:
         """ load model """
         raise NotImplementedError
 
-# ToDo: interactiveにbatchなど必要な情報を読み込ませる
+
 class Interactive(BaseInteractive):
     """ class for training and prediction """
     def __init__(
@@ -61,7 +69,8 @@ class Interactive(BaseInteractive):
             test_label=None,
             outdir: Optional[str]=None,
             exp_name: Optional[str]=None,
-            seed: int=42
+            seed: int=42,
+            **kwargs
             ):
         # arguments
         assert config_path is not None, "!! Give config_path !!"
@@ -84,6 +93,7 @@ class Interactive(BaseInteractive):
         self._seed = {"seed": seed, "g": g, "seed_worker": seed_worker}
         # prepare model
         self.init_model()
+        self.set_params(**kwargs)
 
 
     def init_model(self):
@@ -95,11 +105,23 @@ class Interactive(BaseInteractive):
         self.model = MyNet()
         for param in self.model.parameters(): # 呼び出し方によってたまに外れる恐れがあるため明示
             param.requires_grad = True
-        optimizer1 = RAdamScheduleFree(self.model.parameters(), lr=float(self.config["lr"]), betas=(0.9, 0.999))
+        optimizer = RAdamScheduleFree(self.model.parameters(), lr=float(self.config["lr"]), betas=(0.9, 0.999))
         loss_fn = nn.CrossEntropyLoss() # hard coded
         self.trainer = Trainer(
             self.config, self.model, optimizer, loss_fn, outdir=self.outdir
             )
+
+
+    def set_params(self, **kwargs):
+        """
+        set parameters
+                
+        """
+        # set parameters
+        if kwargs is not None:
+            for k, v in kwargs.items():
+                if k in self.config:
+                    self.config[k] = v
 
 
     def prep_data(self):
@@ -203,7 +225,7 @@ class Interactive(BaseInteractive):
             with open(config_path, "r") as f:
                 self.config = yaml.safe_load(f)
         # initialize the model
-        model_params = inspect.signature(MyModel.__init__).parameters
+        model_params = inspect.signature(MyNet.__init__).parameters
         model_args = {k: self.config[k] for k in model_params if k in self.config}
-        self.model = MyModel(**model_args)
+        self.model = MyNet(**model_args)
         self.model.load_state_dict(torch.load(model_path))
