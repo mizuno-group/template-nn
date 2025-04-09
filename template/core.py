@@ -167,7 +167,7 @@ class Interactive(BaseInteractive):
             if isinstance(test_data, torch.utils.data.Dataset):
                 self.test_dataset = test_data
             elif isinstance(test_data, np.ndarray):
-                self.test_dataset = dh.MyDataset(data=self.test_data, label=self.test_label)
+                self.test_dataset = dh.MyDataset(data=test_data, label=self.test_label)
             else:        
                 raise ValueError("!! test_data must be np.ndarray or torch.utils.data.Dataset !!")
             test_loader = dh.prep_dataloader(
