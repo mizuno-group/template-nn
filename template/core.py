@@ -153,7 +153,7 @@ class Interactive(BaseInteractive):
             shuffle=True,
             num_workers=self.config["num_workers"],
             pin_memory=self.config["pin_memory"],
-            g=self._seed["g"]
+            g=self._seed["g"],
             seed_workers=self._seed["seed_worker"]
             )
         if self.test_data is None:
