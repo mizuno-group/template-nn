@@ -99,11 +99,11 @@ class MyNet(nn.Module):
         # Residual blocks
         self.block0 = self._building_block(64, 64, stride=1, num_blocks=num_blocks)
         # (B, 64, H/4, W/4) -> (B, 64, H/4, W/4), keep the same size
-        self.block1 = self._building_block(64, 128, stride=2, num_blocks=num_blokcs)
+        self.block1 = self._building_block(64, 128, stride=2, num_blocks=num_blocks)
         # (B, 64, H/4, W/4) -> (B, 128, H/8, W/8), downsample
-        self.block2 = self._building_block(128, 256, stride=2, num_blocks=num_blokcs)
+        self.block2 = self._building_block(128, 256, stride=2, num_blocks=num_blocks)
         # (B, 128, H/8, W/8) -> (B, 256, H/16, W/16), downsample
-        self.block3 = self._building_block(256, 512, stride=2, num_blocks=num_blokcs)
+        self.block3 = self._building_block(256, 512, stride=2, num_blocks=num_blocks)
         # (B, 256, H/16, W/16) -> (B, 512, H/32, W/32), downsample
 
         # Final layers
