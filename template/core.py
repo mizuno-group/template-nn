@@ -96,7 +96,10 @@ class Interactive(BaseInteractive):
         hard coded parameters
         
         """
-        self.model = MyNet()
+        # initialize model
+        model_params = inspect.signature(MyNet.__init__).parameters
+        model_args = {k: self.config[k] for k in model_params if k in self.config}
+        self.model = MyNet(**model_args)
         for param in self.model.parameters(): # 呼び出し方によってたまに外れる恐れがあるため明示
             param.requires_grad = True
         optimizer = RAdamScheduleFree(self.model.parameters(), lr=float(self.config["lr"]), betas=(0.9, 0.999))
