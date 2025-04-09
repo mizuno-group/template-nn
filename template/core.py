@@ -161,13 +161,13 @@ class Interactive(BaseInteractive):
             g=self._seed["g"],
             seed_worker=self._seed["seed_worker"]
             )
-        if self.test_data is None:
+        if test_data is None:
             return train_loader, None
         else:
             if isinstance(test_data, torch.utils.data.Dataset):
                 self.test_dataset = test_data
             elif isinstance(test_data, np.ndarray):
-                self.test_dataset = dh.MyDataset(data=test_data, label=self.test_label)
+                self.test_dataset = dh.MyDataset(data=test_data, label=test_label)
             else:        
                 raise ValueError("!! test_data must be np.ndarray or torch.utils.data.Dataset !!")
             test_loader = dh.prep_dataloader(
