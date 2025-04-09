@@ -187,7 +187,7 @@ class Trainer(BaseTrainer):
         self.callbacks.append(self.logger)
         self.outdir = outdir
         # config contents
-        self.exp_name = config.get("exp_name", f"{datetime.now().strftime("%y%m%d-%H%M")}")
+        self.exp_name = config.get("exp_name", f"{datetime.now().strftime('%y%m%d-%H%M')}")
         self.save_model_every = config["save_model_every"]
         # I/O
         self.resdir = os.path.join(self.outdir, self.exp_name)
