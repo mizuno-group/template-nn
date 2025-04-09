@@ -10,6 +10,7 @@ ToDo
 """
 # packages installed in the current environment
 import os, time, yaml, inspect
+from datetime import datetime
 from typing import Optional, Union, List, Any
 import numpy as np
 import pandas as pd
@@ -74,8 +75,9 @@ class Interactive(BaseInteractive):
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
         self.config_path = config_path
-        if exp_name is not None:
-            self.config["exp_name"] = exp_name
+        if exp_name is None:
+            exp_name = f"exp-{datetime.today().strftime('%y%m%d')}"
+        self.config["exp_name"] = exp_name            
         self.outdir = outdir
         # initialize
         self.train_dataset = None
