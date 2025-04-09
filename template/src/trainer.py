@@ -182,6 +182,7 @@ class Trainer(BaseTrainer):
         self.device = config.get("device", "cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
         self.optimizer = optimizer
+        self.loss_fn = loss_fn
         self.logger = DefaultLogger()
         self.callbacks = callbacks
         self.callbacks.append(self.logger)
