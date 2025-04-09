@@ -63,10 +63,6 @@ class Interactive(BaseInteractive):
     def __init__(
             self,
             config_path: str=None,
-            train_data=None,
-            test_data=None,
-            train_label=None,
-            test_label=None,
             outdir: Optional[str]=None,
             exp_name: Optional[str]=None,
             seed: int=42,
@@ -75,8 +71,6 @@ class Interactive(BaseInteractive):
         # arguments
         assert config_path is not None, "!! Give config_path !!"
         assert outdir is not None, "!! Give outdir !!"
-        self.train_data, self.test_data = train_data, test_data
-        self.train_label, self.test_label = train_label, test_label
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
         self.config_path = config_path
@@ -124,9 +118,35 @@ class Interactive(BaseInteractive):
                     self.config[k] = v
 
 
-    def prep_data(self):
-        """ prepare data """
-        self.train_dataset = dh.MyDataset(data=self.train_data, label=self.train_label)
+    def prep_data(
+            self, train_data=None, test_data=None, train_label=None, test_label=None
+            ):
+        """
+        prepare data
+        
+        Parameters
+        ----------
+        train_data: np.ndarray
+            training data or torch.utils.data.Dataset
+
+        test_data: np.ndarray
+            test data or torch.utils.data.Dataset
+
+        train_label: np.ndarray
+            training label
+
+        test_label: np.ndarray
+            test label
+        
+        """
+        if train_data is None:
+            raise ValueError("!! Give train_data !!")
+        if isinstance(train_data, torch.utils.data.Dataset):
+            self.train_dataset = train_data
+        elif isinstance(train_data, np.ndarray):
+            self.train_dataset = dh.MyDataset(data=train_data, label=train_label)
+        else:        
+            raise ValueError("!! train_data must be np.ndarray or torch.utils.data.Dataset !!")
         train_loader = dh.prep_dataloader(
             dataset=self.train_dataset,
             batch_size=self.config["batch_size"],
@@ -136,10 +156,15 @@ class Interactive(BaseInteractive):
             g=self._seed["g"]
             seed_workers=self._seed["seed_worker"]
             )
-        if self.data_test is None:
+        if self.test_data is None:
             return train_loader, None
         else:
-            self.test_dataset = dh.MyDataset(data=self.test_data, label=self.test_label)
+            if isinstance(test_data, torch.utils.data.Dataset):
+                self.test_dataset = test_data
+            elif isinstance(test_data, np.ndarray):
+                self.test_dataset = dh.MyDataset(data=self.test_data, label=self.test_label)
+            else:        
+                raise ValueError("!! test_data must be np.ndarray or torch.utils.data.Dataset !!")
             test_loader = dh.prep_dataloader(
                 dataset=self.test_dataset,
                 batch_size=self.config["batch_size"],
