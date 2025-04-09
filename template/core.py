@@ -143,7 +143,7 @@ class Interactive(BaseInteractive):
             raise ValueError("!! Give train_data !!")
         if isinstance(train_data, torch.utils.data.Dataset):
             self.train_dataset = train_data
-        elif isinstance(train_data, np.ndarray):
+        elif isinstance(train_data, np.ndarray): # hard coded
             self.train_dataset = dh.MyDataset(data=train_data, label=train_label)
         else:        
             raise ValueError("!! train_data must be np.ndarray or torch.utils.data.Dataset !!")
