@@ -111,6 +111,7 @@ class EarlyStopping:
         self.restore_best_model = restore_best_model
         self.verbose = verbose
         self.best_score = None
+        self.best_epoch = None
         self.counter = 0
         self.early_stop = False
         self.best_model_state = None
@@ -119,7 +120,7 @@ class EarlyStopping:
             "max": lambda a, b: a > b
         }[mode]
 
-    def __call__(self, model, score):
+    def __call__(self, model, score, epoch):
         """
         Parameters
         ----------
@@ -129,9 +130,13 @@ class EarlyStopping:
         score: float
             current score (loss or accuracy)
 
+        epoch: int
+            current epoch
+
         """
         if self.best_score is None or self._monitor_fxn(score, self.best_score):
             self.best_score = score
+            self.best_epoch = epoch
             self.counter = 0
             if self.restore_best_model:
                 self.best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -222,7 +227,7 @@ class Trainer(BaseTrainer):
                 print(f"  Train accuracy: {train_acc:.4f}, Test accuracy: {test_acc:.4f}")
             # early stopping
             if self.early_stopping is not None:
-                self.early_stopping(self.model, test_loss)
+                self.early_stopping(self.model, test_loss, i + 1)
                 if self.early_stopping.early_stop:
                     self.history["early_stop_epoch"] = i + 1 # record the epoch
                     break
