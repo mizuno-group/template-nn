@@ -195,6 +195,7 @@ class Trainer(BaseTrainer):
         # config contents
         self.exp_name = config.get("exp_name", f"{datetime.now().strftime('%y%m%d-%H%M')}")
         self.save_model_every = config["save_model_every"]
+        self.log_every = config["log_every"]
         # I/O
         self.resdir = os.path.join(self.outdir, self.exp_name)
         os.makedirs(self.resdir, exist_ok=True)
@@ -221,7 +222,7 @@ class Trainer(BaseTrainer):
                 epoch=i + 1, train_loss=train_loss, test_loss=test_loss, 
                 train_accuracy=train_acc, test_accuracy=test_acc
                 )
-            if (i + 1) % 2 == 0:
+            if (i + 1) % self.log_every == 0:
                 print(f"Epoch: {i + 1}")
                 print(f"  Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}")
                 print(f"  Train accuracy: {train_acc:.4f}, Test accuracy: {test_acc:.4f}")
