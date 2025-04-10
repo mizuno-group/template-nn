@@ -221,7 +221,7 @@ class Trainer(BaseTrainer):
                 epoch=i + 1, train_loss=train_loss, test_loss=test_loss, 
                 train_accuracy=train_acc, test_accuracy=test_acc
                 )
-            if (i + 1) % 10 == 0:
+            if (i + 1) % 2 == 0:
                 print(f"Epoch: {i + 1}")
                 print(f"  Train loss: {train_loss:.4f}, Test loss: {test_loss:.4f}")
                 print(f"  Train accuracy: {train_acc:.4f}, Test accuracy: {test_acc:.4f}")
