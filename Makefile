@@ -14,7 +14,6 @@ help:
 	@echo " make evaluate          - Evaluate model"
 	@echo " make test              - Run tests"
 	@echo " make setup-hooks       - Set up git pre-commit hook"
-	@echo " make notebook          - Launch Jupyter notebook"
 	@echo " make clear-outputs     - Clear all outputs"
 	@echo " make clear-checkpoints - Clear all checkpoints"
 	@echo " make clean             - Clean logs and models"
