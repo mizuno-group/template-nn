@@ -18,9 +18,6 @@ help:
 	@echo " make clear-checkpoints - Clear all checkpoints"
 	@echo " make clean             - Clean logs and models"
 
-data:
-	$(PYTHON) $(SRC_DIR)/data/prepare.py --config $(CONFIG)
-
 train:
 	$(PYTHON) $(SRC_DIR)/train.py --config $(CONFIG)
 
@@ -33,9 +30,6 @@ test:
 setup-hooks:
 	bash scripts/setup-hooks.sh
 	@echo "✅ pre-commit hook has been successfully installed!"
-
-notebook:
-	jupyter notebook notebooks/
 
 clear-outputs:
 	rm -rf outputs/*
