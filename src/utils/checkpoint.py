@@ -2,48 +2,20 @@
 """
 Created on Tue Jul 23 12:09:08 2019
 
-utils
+checkpointや学習履歴を保存・読み込みする関数をまとめる. 
 
 @author: tadahaya
 """
-import json, os, time, yaml
-import random
-import numpy as np
-import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import Any, Dict, Tuple
+import os
+import json
+import yaml
+
 import torch
 
 
-def fix_seed(seed: int=42, fix_cuda: bool=False):
-    """
-    fix the seed for reproducibility
-
-    Parameters:
-    ----------
-    seed : int
-        the seed number
-
-    """
-    # general seed
-    random.seed(seed)  # Python random
-    np.random.seed(seed)  # NumPy random
-    torch.manual_seed(seed)  # PyTorch CPU seed
-    torch.cuda.manual_seed(seed)  # PyTorch GPU seed
-    torch.cuda.manual_seed_all(seed)  # PyTorch all GPU seed
-    # cudnn seed
-    if fix_cuda:
-        torch.backends.cudnn.deterministic = True  # for fixing calculation order etc.
-        torch.backends.cudnn.benchmark = False  # do not use the optimized algorithm
-    # prepare worker seed for DataLoader
-    def seed_worker(worker_id):
-        worker_seed = seed + worker_id
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
-    g = torch.Generator()
-    g.manual_seed(seed)
-    return g, seed_worker  # for worker_init_fn in DataLoader
-
-
-def save_experiment(config, model, optimizer, history, outdir, plot_progress=True):
+def save_experiment(model, optimizer, scheduler, history:Dict, save_dir:str, file_name:str) -> None:
     """
     save the experiment: config, model, metrics, and progress plot
     
@@ -69,13 +41,6 @@ def save_experiment(config, model, optimizer, history, outdir, plot_progress=Tru
         json.dump(history, f, sort_keys=True, indent=4)
     # save the model
     save_checkpoint(model=model, optimizer=optimizer, name="final", outdir=outdir)
-    # plot progress
-    if plot_progress:
-        progress_plot(
-            outdir=outdir,
-            train_values=history["train_loss"],
-            test_values=history["test_loss"]
-        )
 
 
 def save_checkpoint(model, optimizer, name, outdir):
@@ -125,34 +90,3 @@ def load_experiments(model, optimizer, resdir, checkpoint_name="model_final"):
     model.load_state_dict(pkg["model"])
     optimizer.load_state_dict(pkg["optimizer"])
     return model, optimizer, config, history
-
-
-def calc_elapsed_time(start_time):
-    """ calculate elapsed time """
-    elapsed_time = time.time() - start_time
-    h = int(elapsed_time // 3600)
-    m = int((elapsed_time % 3600) // 60)
-    s = elapsed_time % 60
-    return f"{h}h {m}m {s}s"
-
-
-def progress_plot(
-        outdir:str, train_values:list, test_values:list=[],
-        xlabel="epoch", ylabel="loss"
-        ):
-    """ plot learning progress """
-    fileout = os.path.join(outdir, f"progress_{ylabel}.tif")
-    x = list(range(1, len(train_values) + 1, 1))
-    fig, ax = plt.subplots()
-    plt.rcParams['font.size'] = 14
-    ax.plot(x, train_values, c='navy', label='train')
-    if len(test_values) > 0:
-        ax.plot(x, test_values, c='darkgoldenrod', label='test')
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.grid()
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig(fileout, dpi=300, bbox_inches='tight')
-    plt.show()
-    plt.close()

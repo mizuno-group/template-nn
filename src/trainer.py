@@ -15,11 +15,67 @@ configを使う前提なので内容注意
 """
 import os, time
 from datetime import datetime
-from typing import List, Union, Any
+from typing import List, Union, Any, Optional
+from dataclasses import dataclass
+
 import torch
 from torch.nn.utils import clip_grad_norm_
 
-from . import utils # utils.py由来なのがわかりやすい
+from src.data.dataset import DataConfig, build_dataloaders
+from src.utils.general import fix_seed, calc_elapsed_time
+
+
+@dataclass
+class TrainerConfig:
+    """
+    Trainerの設定を管理するクラス.
+    YAMLやJSONなどの設定ファイルから読み込んだdictをこの型に変換して使うことを想定.
+
+    Attributes
+    ----------
+    epochs: int
+        学習エポック数
+
+    batch_size: int
+        バッチサイズ
+
+    num_workers: int
+        DataLoaderのワーカ数
+
+    device: str
+        使用するデバイス (例: "cuda", "cpu")
+
+    save_model_every: int
+        モデルを保存する頻度 (エポック数)
+
+    log_every: int
+        ログを出力する頻度 (エポック数)
+
+    patience: Optional[int]
+        EarlyStoppingのための忍耐期間 (Noneの場合は無効)
+
+    clip_grad: float
+        勾配クリッピングの閾値 (0の場合は無効)
+
+    accum_grad: int
+        勾配蓄積のステップ数
+
+    exp_name: str
+        実験名 (デフォルトは現在時刻)
+    
+    """
+    epochs: int = 100
+    batch_size: int = 32
+    num_workers: int = 4
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    save_model_every: int = 5
+    log_every: int = 1
+    patience: Optional[int] = None
+    clip_grad: float = 0.0  # 勾配クリッピングの閾値 (0.0の場合は無効)
+    accum_grad: int = 1
+    exp_name: str = f"{datetime.now().strftime('%y%m%d-%H%M')}"  # 実験名 (デフォルトは現在時刻)
+
+
 
 # 抽象クラス (ABC使わない)
 class BaseTrainer:
@@ -87,68 +143,6 @@ class DefaultLogger:
         return items
 
 
-class EarlyStopping:
-    def __init__(self, patience=10, mode="min", restore_best_model=True, verbose=True):
-        """
-        Early stopping
-
-        Parameters
-        ----------
-        patience: int
-            number of epochs to wait before stopping
-
-        mode: str
-            "min" or "max" (loss or accuracy)
-
-        restore_best_model: bool
-            whether to restore the best model
-
-        verbose: bool
-            whether to print messages
-
-        """
-        self.patience = patience
-        self.restore_best_model = restore_best_model
-        self.verbose = verbose
-        self.best_score = None
-        self.best_epoch = None
-        self.counter = 0
-        self.early_stop = False
-        self.best_model_state = None
-        self._monitor_fxn = {
-            "min": lambda a, b: a < b,
-            "max": lambda a, b: a > b
-        }[mode]
-
-    def __call__(self, model, score, epoch):
-        """
-        Parameters
-        ----------
-        model: torch.nn.Module
-            current model
-
-        score: float
-            current score (loss or accuracy)
-
-        epoch: int
-            current epoch
-
-        """
-        if self.best_score is None or self._monitor_fxn(score, self.best_score):
-            self.best_score = score
-            self.best_epoch = epoch
-            self.counter = 0
-            if self.restore_best_model:
-                self.best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-                # store the best model state on CPU
-        else:
-            self.counter += 1
-            if self.counter >= self.patience:
-                self.early_stop = True
-                if self.verbose:
-                    print(">> EarlyStopping triggered")
-                if self.restore_best_model and self.best_model_state:
-                    model.load_state_dict(self.best_model_state)
 
 
 class Trainer(BaseTrainer):
