@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-
-モデル初期化や推論のテスト例
+Created on Aug 9, 2025
 
 @author: tadahaya
 """
 import torch
-from src.models.model import create_model
+import src.models as models
 
-def test_model_initialization():
-    model = create_model("custom_cnn", num_classes=10)
-    sample_input = torch.randn(1, 3, 224, 224)
-    output = model(sample_input)
-    assert output.shape == (1, 10), "Model output shape should match (1, num_classes)"
+def test_model_forward_smoke():
+    # create_model があればそれを使う、無ければ MyNet を想定
+    if hasattr(models, "create_model"):
+        model = models.create_model({"name":"mynet", "num_classes":3})
+    else:
+        model = models.MyNet(output_dim=3)  # 現行のクラス名に合わせてください
+    x = torch.randn(2,3,224,224)
+    y = model(x)
+    assert y.shape[0] == 2

@@ -15,7 +15,7 @@
 
 ## 構成
 ------------  
-
+    # 全体概要
     template-nn/
     ├── README.md
     ├── LICENSE
@@ -35,11 +35,7 @@
     ├── scripts/
     │   ├── pre-commit-check.sh       # ファイルサイズ制限フック
     │   └── setup-hooks.sh            # フック設定用
-    ├── src/
-    │   ├── data_handler.py
-    │   ├── models.py
-    │   ├── trainer.py
-    │   └── utils.py
+    ├── src/*
     ├── tests/                        # 適宜srcに併せて変更
     │   ├── test_data.py
     │   ├── test_model.py
@@ -48,9 +44,30 @@
     └── docs/
         └── dvc_guide.md              # DVCの利用ガイド
 
-
 ------------
 
+
+------------  
+    # src詳細
+    src/
+    ├── data/
+    │ ├── dataset.py # DatasetとDataLoaderの組み立て
+    │ └── preprocessing.py # 前処理(クリーニング・正規化・特徴生成)
+    │
+    ├── models.py # モデル定義
+    │
+    ├── trainer.py # 学習ロジックの中心 (fit/evaluateの公開API)
+    │
+    ├── utils/
+    │ ├── general.py # シード固定・時間計測などの純汎用ユーティリティ
+    │ ├── checkpoint.py # モデル/履歴の保存・読み込み(Checkpoint操作)
+    │ ├── plot.py # 学習曲線などのプロット
+    │ └── callbacks.py # 学習callback (EarlyStopping・DefaultLoggerなど)
+    │
+    ├── train.py # 学習のentry (薄いCLI)
+    └── evaluate.py # 評価のentry (薄いCLI)
+
+------------
 
 
 
