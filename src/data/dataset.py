@@ -2,182 +2,161 @@
 """
 Created on Fri 29 15:46:32 2022
 
-pytorchでのデータセットの実装のテンプレート.
-基本的にはMyDatasetクラスを実装し, DataLoaderを作成する関数があればよい.
+データ周りの入り口(DatasetとDataLoaderをつくる役)
+- PyTorchのDataset/DataLoaderを組み立てる責務に限定
+- クリーニングや特徴量生成などの前処理はpreprocessing.py
+- 画像解析を想定したDatasetクラスを実装
 
 @author: tadahaya
 """
-import numpy as np
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict, Any
+from dataclasses import dataclass
+from pathlib import Path
 
 import torch
-import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+from PIL import Image # 汎用の画像処理ライブラリ
 
-# 必須
-class MyDataset(Dataset):
+# 1. Configコンテナ
+@dataclass
+class DataConfig:
     """
-    Custom dataset implementation for supervised and unsupervised tasks.
+    データ読み込みの設定を管理するクラス.
+    YAMLやJSONなどの設定ファイルから読み込んだdictをこの型に変換して使うことを想定.
+    
+    Attributes
+    ----------
 
+    """
+    train_path: str
+    val_path: Optional[str] = None
+    batch_size: int = 32
+    num_workers: int = 4
+    pin_memory: bool = True
+    shuffle: bool = True
+
+
+# 2. Datasetクラスの実装
+class SimpleDataset(Dataset):
+    """
+    最小構成のカスタムDatasetクラス.
+    画像解析を想定している.
+    画像データとラベルを読み込み, 必要に応じて変換を適用する.
+    IO律速になるように見えるが, DataLoaderのnum_workersを増やすことで
+    並列処理が可能になるため, IOのボトルネックを軽減できる点が味噌.
+     
     Parameters
     ----------
-    data : np.ndarray
-        Array containing the data samples.
-
-    label : Optional[np.ndarray]
-        Array containing labels for supervised learning.
-        Defaults to `None` for unsupervised learning.
+    data_path : str
+        データセットのルートディレクトリのパス.
+        各クラスの画像はこのディレクトリ内のサブディレクトリに格納されていることを想定.
+        例: "data/train"
 
     transform : Optional[callable]
-        Transformation function to apply to the data samples.
+        画像に適用する変換関数.
+        例えば, torchvision.transformsを使って画像の前処理を行うことができる.
+        デフォルトはNoneで, その場合は画像をTensorに変換するだけの処理が行われる.
+    
     """
     def __init__(
         self,
-        data:np.ndarray=None,
-        label:Optional[np.ndarray]=None,
-        transform:Optional[callable]=None
+        data_path: str,
+        transform:Optional[callable]=None,
+        **kwargs: Any,
         ) -> None:
-        if data is None:
-            raise ValueError("`data` cannot be None. Please provide the input data.")
-        if label is None:
-            label = np.full(len(data), np.nan)  # Assign NaN for unsupervised learning
-        if not isinstance(transform, list):
-            self.transform = [transform]
-        else:
-            self.transform = transform
-        self.data = data
-        self.label = label
-        self.datanum = len(self.data)
-
-    def __len__(self) -> int:
-        """ Returns the number of samples in the dataset. """
-        return self.datanum
-
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, float]:
-        """
-        Retrieves a single data sample and its corresponding label.
-        
-        Args:
-            idx (int): Index of the data sample.
-        
-        Returns:
-            Tuple[torch.Tensor, float]: Transformed data sample and its label.
-        """
-        out_data = self.data[idx]
-        out_label = self.label[idx]
-        if self.transform:
-            for t in self.transform:
-                if t is not None:
-                    out_data = t(out_data)
-        return out_data, out_label
-
-
-def prep_dataloader(
-    dataset:Dataset=None,
-    batch_size:int=None,
-    shuffle:Optional[bool]=None,
-    num_workers:int=2,
-    pin_memory:bool=True,
-    g:Optional[torch.Generator]=None,
-    seed_worker:Optional[callable]=None
-    ) -> DataLoader:
-    """
-    prepare train and test loader
-    
-    Parameters
-    ----------
-    dataset: torch.utils.data.Dataset
-        prepared Dataset instance
-    
-    batch_size: int
-        the batch size
-    
-    shuffle: bool
-        whether data is shuffled or not
-
-    num_workers: int
-        the number of threads or cores for computing
-        should be greater than 2 for fast computing
-    
-    pin_memory: bool
-        determines use of memory pinning
-        should be True for fast computing
-    
-    """
-    loader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-        generator=g,
-        worker_init_fn=seed_worker,
-        )    
-    return loader
-
-
-# オプション
-class SubsetWrapper(Dataset):
-    """
-    Wrapper class for creating a subset of a given dataset.
-
-    Parameters
-    ----------
-    dataset : torch.utils.data.Dataset
-        Original dataset from which to create the subset.
-
-    transform : Optional[callable]
-        Transformation function to apply to the data samples.
-
-    """
-    def __init__(self, dataset, transform=None):
-        self.dataset = dataset
+        super().__init__()
+        self.data_path = Path(data_path)
         self.transform = transform
 
-    def __len__(self):
-        return len(self.dataset)
+        # 1. クラス名とラベルIDの対応表を作成
+        self.class_to_idx = {d.name: i for i, d in enumerate(self.data_path.iterdir()) if d.is_dir()}
+        self.idx_to_class = {i: d for d, i in self.class_to_idx.items()}
 
-    def __getitem__(self, idx):
-        image, label = self.dataset[idx]
+        # 2. 全ての画像のパスとラベルIDのペアをリストに格納
+        self.items = []
+        for class_name, label_idx in self.class_to_idx.items():
+            class_dir = self.data_path / class_name
+            for image_path in class_dir.glob("*"):
+                if image_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
+                    self.items.append((str(image_path), label_idx))
+
+
+    def __len__(self) -> int:
+        """
+        データの総数を返す.
+        ほとんど呼び出されないため, 効率はそれほど重要ではない.
+
+        """
+        return len(self.items)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+        """
+        指定されたインデックスのデータサンプルを取得する.
+        ラベルはint型で返すが, DataLoaderのcollate_fnのデフォルトで
+        バッチ内のサンプルをまとめる際に, Tensor型に変換される.
+
+        Parameters
+        ----------
+        idx : int
+            Index of the data sample.
+
+        """
+        # 1. 指定されたidx番目のデータを取得
+        image_path, label = self.items[idx]
+
+        # 2. 画像の読み込み
+        image = Image.open(image_path).convert("RGB")
+
+        # 3. 画像の変換
         if self.transform:
+            # 変換が指定されている場合はそれを適用, 内部にTensor変換が含まれていることを想定
             image = self.transform(image)
+        else:
+            # デフォルトの変換: Tensorに変換
+            to_tensor = transforms.ToTensor()
+            image = to_tensor(image)
         return image, label
 
 
-def split_dataset(
-    full_dataset:Dataset, split_ratio:float=0.8, shuffle:bool=True,
-    transform:Tuple[Optional[List[callable]], Optional[List[callable]]]=(None, None),
-) -> Tuple[Dataset, Dataset]:
+# 3. DataLoaderを組むための関数
+def build_dataloaders(cfg: DataConfig) -> Tuple[DataLoader, DataLoader]:
     """
-    Splits a dataset into training and validation sets.
-
+    データローダーを構築する関数.
+    
     Parameters
     ----------
-    full_dataset : torch.utils.data.Dataset
-        The dataset to split.
+    cfg : DataConfig
+        データ読み込みの設定を含むDataConfigインスタンス.
 
-    split_ratio : float
-        The ratio of the dataset to use for training.
+    Returns
+    -------
+    Tuple[DataLoader, DataLoader]
+        訓練用と検証用のDataLoaderのタプル.
 
-    shuffle : bool
-        Whether to shuffle the data before splitting.
-
-    transform : Tuple[Optional[List[callable]], Optional[List[callable]]]
-        Transformations to apply to the training and validation datasets.
-        The first element is for the training dataset and the second is for the validation dataset.
- 
     """
-    dataset_size = len(full_dataset)
-    indices = list(range(dataset_size))
-    split = int(np.floor(split_ratio * dataset_size))
-    if shuffle:
-        np.random.shuffle(indices)
-    train_indices, val_indices = indices[:split], indices[split:]
-    train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
-    val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
-    # transformの適用
-    if transform[0]:
-        train_dataset = SubsetWrapper(train_dataset, transform[0])
-    if transform[1]:
-        val_dataset = SubsetWrapper(val_dataset, transform[1])
-    return train_dataset, val_dataset
+    # 1. Datasetのインスタンスを作成
+    train_ds = SimpleDataset(data_path=cfg.train_path)
+    
+    # 2. DataLoaderを作成
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=cfg.shuffle,
+        num_workers=cfg.num_workers,
+        pin_memory=cfg.pin_memory,
+    )
+    
+    # 3. 検証用データセットが指定されている場合は検証用DataLoaderも作成
+    val_loader = None
+    if cfg.val_path:
+        val_ds = SimpleDataset(data_path=cfg.val_path, transform=None)
+        val_loader = DataLoader(
+            val_ds,
+            batch_size=cfg.batch_size,
+            shuffle=False,  # 検証データはシャッフルしない
+            num_workers=cfg.num_workers,
+            pin_memory=cfg.pin_memory,
+        )
+    
+    return train_loader, val_loader
