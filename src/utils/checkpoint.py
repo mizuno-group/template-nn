@@ -1,92 +1,117 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul 23 12:09:08 2019
+Created on Friday August 15 15:24:05 2025
 
-checkpointや学習履歴を保存・読み込みする関数をまとめる. 
+checkpointや学習履歴を保存・読み込みする関数をまとめる (純I/O). 
 
 @author: tadahaya
 """
+from __future__ import annotations
 from pathlib import Path
-from typing import Any, Dict, Tuple
-import os
+from typing import Any, Dict, NamedTuple, Optional
 import json
 import yaml
 
 import torch
 
-
-def save_experiment(model, optimizer, scheduler, history:Dict, save_dir:str, file_name:str) -> None:
-    """
-    save the experiment: config, model, metrics, and progress plot
-    
-    outdir
-    ├── experiment_name (resdir)
-        ├── config.yaml
-        ├── history.json
-        ├── progress_loss.tif
-        ├── model_final.pt
-        ├── model_1.pt
-        ├── model_2.pt
-        ├── ...
-    
-    """
-    os.makedirs(outdir, exist_ok=True)
-    # save config
-    configfile = os.path.join(outdir, 'config.yaml')
-    with open(configfile, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False) 
-    # save history
-    historyfile = os.path.join(outdir, 'history.json')
-    with open(historyfile, 'w') as f:
-        json.dump(history, f, sort_keys=True, indent=4)
-    # save the model
-    save_checkpoint(model=model, optimizer=optimizer, name="final", outdir=outdir)
+class ExperimentSnapshot(NamedTuple):
+    config: Dict[str, Any]
+    history: Dict[str, Any]
+    model_state: Optional[Dict[str, Any]]
+    optimizer_state: Optional[Dict[str, Any]]
+    scheduler_state: Optional[Dict[str, Any]]
 
 
-def save_checkpoint(model, optimizer, name, outdir):
+def save_snapshot(
+    *, # キーワード引数を強制
+    outdir: str | Path,
+    config: Dict[str, Any],
+    history: Dict[str, Any],
+    model: Any, # torch.nn.Module
+    optimizer: Any, # torch.optim.Optimizer
+    scheduler: Optional[Any] = None,
+    name: str = "final",
+) -> None:
     """
-    save the model checkpoint
+    実験スナップショット一式(設定, 履歴, 状態辞書)を保存する.
     
+    outdir/
+      ├─ config.yaml
+      ├─ history.json
+      └─ model_{name}.pt
     """
-    cpfile = os.path.join(outdir, f"model_{name}.pt")
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-        },
-        cpfile
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    # config
+    (outdir / "config.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
+
+    # history
+    (outdir / "history.json").write_text(
+        json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    # states
+    cp_path = outdir / f"model_{name}.pt"
+    pkg = {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+    }
+    if scheduler is not None:
+        try:
+            pkg["scheduler"] = scheduler.state_dict()
+        except AttributeError:
+            # .state_dict()を持たないスケジューラもあるため
+            pass
+    torch.save(pkg, cp_path)
+    print(f"Saved snapshot to {outdir}")
+
+
+def load_snapshot(
+    *, # キーワード引数を強制
+    resdir: str | Path,
+    checkpoint_name: str = "model_final",
+) -> ExperimentSnapshot:
+    """
+    実験スナップショット(設定, 履歴, 状態辞書)をファイルから読み込む.
+    ファイルの読み込みに専念し, 状態の適用は行わない.
+    
+    Returns
+    -------
+    ExperimentSnapshot
+        実験の状態をまとめた名前付きタプル.
+
+    """
+    resdir = Path(resdir)
+
+    # config / history の読み込み
+    config_path = resdir / "config.yaml"
+    history_path = resdir / "history.json"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    history = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {}
+
+    # states (モデル等の状態辞書)の読み込み
+    ckpt_path = _normalize_ckpt_name(resdir, checkpoint_name)
+    model_state, opt_state, sch_state = _load_states(ckpt_path) if ckpt_path.exists() else (None, None, None)
+
+    return ExperimentSnapshot(
+        config=config,
+        history=history,
+        model_state=model_state,
+        optimizer_state=opt_state,
+        scheduler_state=sch_state
     )
 
 
-def load_experiments(model, optimizer, resdir, checkpoint_name="model_final"):
-    """
-    load the experiment
+def _load_states(path: Path) -> tuple[Dict, Optional[Dict], Optional[Dict]]:
+    """1つの.ptファイルからstate_dict群を辞書で受け取る."""
+    pkg = torch.load(path, map_location="cpu")
+    return pkg.get("model", {}), pkg.get("optimizer"), pkg.get("scheduler")
 
-    Parameters
-    ----------
-    model: nn.Module
-        initialized model
 
-    optimizer: torch.optim
-        initialized optimizer
-
-    resdir: str
-        the result directory
-    
-    checkpoint_name: str
-        the checkpoint name, like model_final
-    
-    """
-    # load config
-    configfile = os.path.join(resdir, "config.yaml")
-    with open(configfile, 'r') as f:
-        config = yaml.safe_load(f)
-    # load history
-    historyfile = os.path.join(resdir, 'hisotry.json')
-    with open(historyfile, 'r') as f:
-        history = json.load(f)
-    # load model
-    pkg = torch.load(os.path.join(resdir, checkpoint_name))
-    model.load_state_dict(pkg["model"])
-    optimizer.load_state_dict(pkg["optimizer"])
-    return model, optimizer, config, history
+def _normalize_ckpt_name(resdir: Path, name: str) -> Path:
+    """ "model_final" のような拡張子なし指定でも安全に .pt を補う."""
+    p = resdir / name
+    return p.with_suffix(".pt") if p.suffix != ".pt" else p

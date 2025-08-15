@@ -12,6 +12,34 @@ import torch.nn.functional as F
 
 import numpy as np
 
+
+
+def create_model(cfg: dict) -> nn.Module:
+    """
+    configに基づきモデルを構築する関数.
+    
+    Parameters
+    ----------
+    cfg : dict
+        Configuration dictionary containing model parameters.
+
+    Returns
+    -------
+    nn.Module
+        The constructed model.
+    """
+    model = MyNet(
+        output_dim=cfg.get("output_dim", 1000),
+        num_blocks=cfg.get("num_blocks", 2)
+    )
+    return model
+
+
+
+
+
+
+
 class Block(nn.Module):
     """
     A residual block consisting of three convolutional layers with skip connections.

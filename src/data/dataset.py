@@ -1,162 +1,215 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri 29 15:46:32 2022
+Created on Friday August 15 15:39:49 2025
 
-データ周りの入り口(DatasetとDataLoaderをつくる役)
-- PyTorchのDataset/DataLoaderを組み立てる責務に限定
-- クリーニングや特徴量生成などの前処理はpreprocessing.py
-- 画像解析を想定したDatasetクラスを実装
+データセットとDataLoaderの構築
+- DataConfig: 設定の入れ物
+- build_dataloaders(dc): (train_loader, val_loader|None)を返す
+- 画像ディレクトリ or numpy(.npy/.npz) の双方をサポート
 
 @author: tadahaya
 """
-from typing import Tuple, Optional, List, Dict, Any
-from dataclasses import dataclass
+# src/data/dataset.py
+
+from __future__ import annotations
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional, Tuple, Any, Dict, Callable
 
+import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
-from PIL import Image # 汎用の画像処理ライブラリ
+from torch.utils.data import DataLoader, Dataset, Subset
+from torchvision.datasets import ImageFolder
 
-# 1. Configコンテナ
-@dataclass
-class DataConfig:
-    """
-    データ読み込みの設定を管理するクラス.
-    YAMLやJSONなどの設定ファイルから読み込んだdictをこの型に変換して使うことを想定.
-    
-    Attributes
-    ----------
+from src.utils.general import fix_seed
+from . import preprocessing as PP
 
-    """
-    train_path: str
-    val_path: Optional[str] = None
-    batch_size: int = 32
-    num_workers: int = 4
-    pin_memory: bool = True
-    shuffle: bool = True
+# ---- 1. Datasetの実装 ----
+# src/data/dataset.py 内
 
-
-# 2. Datasetクラスの実装
-class SimpleDataset(Dataset):
-    """
-    最小構成のカスタムDatasetクラス.
-    画像解析を想定している.
-    画像データとラベルを読み込み, 必要に応じて変換を適用する.
-    IO律速になるように見えるが, DataLoaderのnum_workersを増やすことで
-    並列処理が可能になるため, IOのボトルネックを軽減できる点が味噌.
-     
-    Parameters
-    ----------
-    data_path : str
-        データセットのルートディレクトリのパス.
-        各クラスの画像はこのディレクトリ内のサブディレクトリに格納されていることを想定.
-        例: "data/train"
-
-    transform : Optional[callable]
-        画像に適用する変換関数.
-        例えば, torchvision.transformsを使って画像の前処理を行うことができる.
-        デフォルトはNoneで, その場合は画像をTensorに変換するだけの処理が行われる.
-    
-    """
-    def __init__(
-        self,
-        data_path: str,
-        transform:Optional[callable]=None,
-        **kwargs: Any,
-        ) -> None:
-        super().__init__()
-        self.data_path = Path(data_path)
+class NpDataset(Dataset):
+    """ メモリ上のNumPy配列を扱う. Tensorへの変換とCHW正規化を行う. """
+    def __init__(self, data: np.ndarray, label: np.ndarray, transform: Optional[Callable] = None):
+        assert data.ndim >= 3, "!! Data shape should be (N, C, H, W) or (N, H, W, C) !!"
+        self.data = data
+        self.label = label
         self.transform = transform
 
-        # 1. クラス名とラベルIDの対応表を作成
-        self.class_to_idx = {d.name: i for i, d in enumerate(self.data_path.iterdir()) if d.is_dir()}
-        self.idx_to_class = {i: d for d, i in self.class_to_idx.items()}
-
-        # 2. 全ての画像のパスとラベルIDのペアをリストに格納
-        self.items = []
-        for class_name, label_idx in self.class_to_idx.items():
-            class_dir = self.data_path / class_name
-            for image_path in class_dir.glob("*"):
-                if image_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
-                    self.items.append((str(image_path), label_idx))
-
-
     def __len__(self) -> int:
-        """
-        データの総数を返す.
-        ほとんど呼び出されないため, 効率はそれほど重要ではない.
+        return len(self.data)
 
-        """
-        return len(self.items)
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
+        x, y = self.data[idx], self.label[idx]
+        # NumPy配列をPyTorch Tensorに変換し, CHW形式に正規化する
+        if isinstance(x, np.ndarray):
+            x = torch.from_numpy(x)  # (C, H, W) or (H, W, C)
+            # チャンネルが先頭に来ていない場合(HWC形式), CHW形式に変換
+            if x.ndim == 3 and x.shape[0] not in (1, 3):
+                x = x.permute(2, 0, 1) # HWC -> CHW
+            x = x.contiguous()
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        """
-        指定されたインデックスのデータサンプルを取得する.
-        ラベルはint型で返すが, DataLoaderのcollate_fnのデフォルトで
-        バッチ内のサンプルをまとめる際に, Tensor型に変換される.
-
-        Parameters
-        ----------
-        idx : int
-            Index of the data sample.
-
-        """
-        # 1. 指定されたidx番目のデータを取得
-        image_path, label = self.items[idx]
-
-        # 2. 画像の読み込み
-        image = Image.open(image_path).convert("RGB")
-
-        # 3. 画像の変換
+        # Transformを適用
         if self.transform:
-            # 変換が指定されている場合はそれを適用, 内部にTensor変換が含まれていることを想定
-            image = self.transform(image)
-        else:
-            # デフォルトの変換: Tensorに変換
-            to_tensor = transforms.ToTensor()
-            image = to_tensor(image)
-        return image, label
+            x = self.transform(x)
+            
+        return x, y
 
+# ---- 2. DataConfig ----
+@dataclass
+class DataConfig:
+    # 共通ローダー設定
+    batch_size: int = 32
+    num_workers: int = 2
+    pin_memory: bool = True
+    seed: int = 42
 
-# 3. DataLoaderを組むための関数
-def build_dataloaders(cfg: DataConfig) -> Tuple[DataLoader, DataLoader]:
-    """
-    データローダーを構築する関数.
+    # データパス設定
+    train_path: str
+    val_path: Optional[str] = None
     
-    Parameters
-    ----------
-    cfg : DataConfig
-        データ読み込みの設定を含むDataConfigインスタンス.
+    # データ型 ('image_folder' | 'numpy')
+    dataset_type: str = "image_folder"
 
-    Returns
-    -------
-    Tuple[DataLoader, DataLoader]
-        訓練用と検証用のDataLoaderのタプル.
+    # 検証データの自動分割設定 (val_pathがない場合に使用)
+    val_split: Optional[float] = None # 例: 0.2 (20%を検証用に)
+    shuffle_split: bool = True # 分割時にシャッフルするか否か
+
+    # Transformの設定
+    transform_params: Dict[str, Any] = field(default_factory=dict)
+
+
+# ---- 3. ヘルパー関数 ----
+class _SubsetWithTransform(Dataset):
+    """
+    Subsetごとに異なるTransformを適用するためのラッパークラス.
+    元のデータセットを共有しつつ, 個別の前処理を可能にする.
 
     """
-    # 1. Datasetのインスタンスを作成
-    train_ds = SimpleDataset(data_path=cfg.train_path)
+    def __init__(self, dataset: Dataset, indices: list[int], transform: Optional[Callable]):
+        self.dataset = dataset
+        self.indices = indices
+        self.transform = transform
+
+    def __getitem__(self, idx):
+        # indicesを使って元のデータセットから, 未変換のデータを取得
+        x, y = self.dataset[self.indices[idx]]
+        # このサブセット専用のTransformを適用
+        if self.transform:
+            x = self.transform(x)
+        return x, y
+
+    def __len__(self):
+        return len(self.indices)
+
+
+def _create_dataset(
+    path: str,
+    dataset_type: str,
+    transform: Optional[Callable] = None
+) -> Dataset:
+    """ パスと種類から単一のDatasetインスタンスを生成する. """
+    if dataset_type == "image_folder":
+        return ImageFolder(root=path, transform=transform)
+    elif dataset_type == "numpy":
+        X, Y = _load_numpy_pair(path)
+        return NpDataset(X, Y, transform=transform)
+    raise ValueError(f"!! 未対応の dataset_type: {dataset_type} !!")
+
+
+def _split_dataset(
+    train_ds: Dataset,
+    val_split: float,
+    seed: int,
+    shuffle: bool,
+    tfm_train: Callable, # 引数としてTransformを受け取る
+    tfm_val: Callable    # 引数としてTransformを受け取る
+) -> Tuple[Dataset, Dataset]:
+    """
+    訓練データセットをそれぞれ適切なTransformを持つ訓練用と検証用のサブセットに分割する.
+
+    """
+    n_samples = len(train_ds)
+    indices = list(range(n_samples))
+    split_idx = int(n_samples * (1 - val_split))
     
-    # 2. DataLoaderを作成
+    if shuffle:
+        rng = np.random.default_rng(seed)
+        rng.shuffle(indices)
+
+    train_indices = indices[:split_idx]
+    val_indices = indices[split_idx:]
+
+    # ラッパーに渡す前に, 元のデータセットのTransformを一時的に解除する.
+    # ラッパーは常に生データを取得し, 独自のTransformを適用できる.
+    original_transform = train_ds.transform
+    train_ds.transform = None
+
+    # _SubsetWithTransformを使って, それぞれにTransformを設定
+    train_subset = _SubsetWithTransform(train_ds, train_indices, transform=tfm_train)
+    val_subset = _SubsetWithTransform(train_ds, val_indices, transform=tfm_val)
+    
+    # 元のデータセットの状態を復元(丁寧な実装)
+    train_ds.transform = original_transform
+    
+    return train_subset, val_subset
+
+
+def _load_numpy_pair(path: str | Path) -> Tuple[np.ndarray, np.ndarray]:
+    """ 単一の.npy/.npzファイルから(X, y)を読み込む. """
+    data = np.load(path)
+    # .npzの場合は 'x', 'y' というキーがあることを想定
+    if isinstance(data, np.lib.npyio.NpzFile):
+        return data['x'], data['y']
+    raise TypeError(f"!! NumPyデータは'x'と'y'のkeyを持つ.npzファイル. !!")
+
+
+# ---- 4. 公開API ----
+def build_dataloaders(dc: DataConfig) -> Tuple[DataLoader, Optional[DataLoader]]:
+    """
+    DataConfigに基づき, 訓練用と検証用のDataLoaderを構築する.
+
+    """
+    # Transformを構築
+    tfm_train = PP.build_transforms(is_train=True, **dc.transform_params)
+    tfm_val = PP.build_transforms(is_train=False, **dc.transform_params)
+    
+    # Datasetを構築
+    train_ds = _create_dataset(dc.train_path, dc.dataset_type, tfm_train)
+    val_ds = None
+
+    if dc.val_path:
+        val_ds = _create_dataset(dc.val_path, dc.dataset_type, tfm_val)
+    elif dc.val_split:
+        # _split_datasetにTransformを渡す
+        train_ds, val_ds = _split_dataset(
+            train_ds=train_ds,
+            val_split=dc.val_split,
+            seed=dc.seed,
+            shuffle=dc.shuffle_split,
+            tfm_train=tfm_train,
+            tfm_val=tfm_val
+        )
+
+    # DataLoaderを生成
+    g, seed_worker = fix_seed(dc.seed)
     train_loader = DataLoader(
         train_ds,
-        batch_size=cfg.batch_size,
-        shuffle=cfg.shuffle,
-        num_workers=cfg.num_workers,
-        pin_memory=cfg.pin_memory,
+        batch_size=dc.batch_size,
+        shuffle=True,
+        num_workers=dc.num_workers,
+        pin_memory=dc.pin_memory,
+        generator=g,
+        worker_init_fn=seed_worker
     )
-    
-    # 3. 検証用データセットが指定されている場合は検証用DataLoaderも作成
     val_loader = None
-    if cfg.val_path:
-        val_ds = SimpleDataset(data_path=cfg.val_path, transform=None)
+    if val_ds:
         val_loader = DataLoader(
             val_ds,
-            batch_size=cfg.batch_size,
-            shuffle=False,  # 検証データはシャッフルしない
-            num_workers=cfg.num_workers,
-            pin_memory=cfg.pin_memory,
+            batch_size=dc.batch_size * 2, # 検証では勾配計算しないので大きめに設定
+            shuffle=False,
+            num_workers=dc.num_workers,
+            pin_memory=dc.pin_memory,
+            # 検証では乱数を使わないのでgenerator等は不要
         )
-    
+
     return train_loader, val_loader
